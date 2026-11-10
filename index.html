@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>刊登助手入口</title>
+<style>
+  :root{ --ink:#14213d; --mut:#6b7280; --line:#e5e7eb; --bg:#f5f7fb; --card:#fff; }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;padding:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:30px 28px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(20,33,61,.07)}
+  h1{font-size:17px;margin:0 0 6px}
+  p{color:var(--mut);font-size:13.5px;line-height:1.7;margin:0 0 18px}
+  a.go{display:block;text-align:center;background:var(--ink);color:#fff;text-decoration:none;
+    border-radius:10px;padding:14px;font-size:15px;font-weight:700}
+  a.go:hover{opacity:.9}
+  .url{font-size:12px;color:var(--mut);word-break:break-all;margin-top:14px}
+  .off{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;
+    padding:14px;font-size:13.5px;line-height:1.7}
+  .at{font-size:12px;color:#9aa3af;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>刊登助手</h1>
+  <p id="msg">正在找目前的網址…</p>
+  <div id="box"></div>
+  <div class="at" id="at"></div>
+</div>
+<script>
+// 對外網址每次重開都會換一組（免費通道的特性），所以這一頁是固定的入口：
+// 它去讀一個小檔案，拿到「現在那一組」再把你送過去。
+const RAW='https://raw.githubusercontent.com/a771106514145514-lgtm/go591/main/url.txt';
+(async()=>{
+  let txt='';
+  try{
+    const r=await fetch(RAW+'?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) txt=(await r.text()).trim();
+  }catch(e){}
+  const [url,at]=txt.split('\n').map(s=>(s||'').trim());
+  const msg=document.getElementById('msg'), box=document.getElementById('box');
+  if(!/^https:\/\//.test(url||'')){
+    msg.textContent='現在沒有開放連線。';
+    box.innerHTML='<div class="off">主機現在沒有開著，所以連不進來。'
+      +'請管理者開一下，或是等一下再重新整理這一頁。</div>';
+    return;
+  }
+  document.getElementById('at').textContent=at?('網址更新於 '+at):'';
+  // 主機可能臨時關掉（或 Mac 睡著了），網址還留在檔案裡。
+  // 先輕輕敲一下，敲不到就直接講，不要讓他盯著一個連不上的頁面。
+  let alive=true;
+  try{
+    const stop=new AbortController();
+    const t=setTimeout(()=>stop.abort(),5000);
+    await fetch(url+'/login',{mode:'no-cors',cache:'no-store',signal:stop.signal});
+    clearTimeout(t);
+  }catch(e){ alive=false; }
+  if(!alive){
+    msg.textContent='現在連不上主機。';
+    box.innerHTML='<div class="off">網址是通的，但那台 Mac 現在沒開著（或剛好在重開）。'
+      +'等一下重新整理這一頁就好。</div>'
+      +'<div class="url">還是要試試看：<a href="'+url+'">'+url+'</a></div>';
+    return;
+  }
+  msg.textContent='要用你自己的帳號密碼登入。';
+  box.innerHTML='<a class="go" href="'+url+'">進入刊登助手</a>'
+    +'<div class="url">'+url+'</div>';
+  setTimeout(()=>{ location.href=url; },1200);
+})();
+</script>
+</body></html>
