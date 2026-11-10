@@ -35,12 +35,26 @@
 // 對外網址每次重開都會換一組（免費通道的特性），所以這一頁是固定的入口：
 // 它去讀一個小檔案，拿到「現在那一組」再把你送過去。
 const RAW='https://raw.githubusercontent.com/a771106514145514-lgtm/go591/main/url.txt';
+// raw 那個網址有 CDN 快取，網址剛換的時候會慢個幾十秒才跟上。
+// 所以同時問 GitHub API（它不吃那層快取），兩邊都拿，誰新用誰。
+const API='https://api.github.com/repos/a771106514145514-lgtm/go591/contents/url.txt';
+async function grab(){
+  const out=[];
+  await Promise.all([
+    fetch(RAW+'?t='+Date.now(),{cache:'no-store'})
+      .then(r=>r.ok?r.text():'').then(t=>out.push(t)).catch(()=>{}),
+    fetch(API+'?t='+Date.now(),{cache:'no-store',
+        headers:{'Accept':'application/vnd.github.raw'}})
+      .then(r=>r.ok?r.text():'').then(t=>out.push(t)).catch(()=>{}),
+  ]);
+  // 第二行是更新時間，拿它來分新舊
+  const rows=out.map(t=>(t||'').trim()).filter(t=>/^https:\/\//.test(t))
+    .map(t=>{ const [u,a]=t.split('\n').map(x=>(x||'').trim()); return {u,a,t}; });
+  rows.sort((x,y)=>(y.a||'').localeCompare(x.a||''));
+  return rows.length?rows[0].t:'';
+}
 (async()=>{
-  let txt='';
-  try{
-    const r=await fetch(RAW+'?t='+Date.now(),{cache:'no-store'});
-    if(r.ok) txt=(await r.text()).trim();
-  }catch(e){}
+  const txt=await grab();
   const [url,at]=txt.split('\n').map(s=>(s||'').trim());
   const msg=document.getElementById('msg'), box=document.getElementById('box');
   if(!/^https:\/\//.test(url||'')){
